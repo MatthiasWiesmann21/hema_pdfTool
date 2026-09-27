@@ -1,0 +1,20 @@
+[package]
+name = "hema_pdf_tool"
+version = "0.2.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4", features = ["derive"] }
+dirs = "7.0.0"
+eframe = "0.36"
+egui_dnd = "0.17"
+pdfium-render = "0.9"
+rfd = "0.17.2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

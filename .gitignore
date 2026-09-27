@@ -1,0 +1,6 @@
+/target
+/pdfium.dll
+/testdata
+/installer
+/nul
+*.pdf
