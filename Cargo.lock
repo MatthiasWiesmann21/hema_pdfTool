@@ -966,6 +966,7 @@ dependencies = [
  "egui-wgpu",
  "egui-winit",
  "egui_glow",
+ "glow",
  "glutin",
  "glutin-winit",
  "image",
@@ -1584,7 +1585,7 @@ dependencies = [
 
 [[package]]
 name = "hema_pdf_tool"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",

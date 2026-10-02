@@ -27,6 +27,15 @@ Merges all `*.pdf` in `<dir>` (alphabetical) into `<file>`. Logs to
 `%APPDATA%\hema_pdfTool\merge.log`. The GUI's "Schedule…" panel registers
 this command as Windows Task Scheduler task `HemaPdfTool-AutoMerge`.
 
+## GUI startup diagnostics
+
+The release exe is `windows_subsystem = "windows"` — no console, so all
+startup output would be lost. Instead, GUI startup/panics log to
+`%APPDATA%\hema_pdfTool\gui.log`. eframe tries wgpu first, then falls
+back to the `glow` (OpenGL) renderer if no GPU adapter is available
+(VMs, RDP, old drivers). The exe statically links the CRT
+(`.cargo/config.toml`), so no VC++ redistributable is needed.
+
 ## Windows installer
 
 ```cmd

@@ -5,7 +5,7 @@
 
 #define AppName "hema pdfTool"
 #define AppExeName "hema_pdf_tool.exe"
-#define AppVersion "0.2.0"
+#define AppVersion "0.2.1"
 #define AppId "{{551BC3FC-D69E-4602-9162-DBA9BD45C5F8}"
 
 [Setup]

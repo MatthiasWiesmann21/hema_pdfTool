@@ -23,6 +23,7 @@ struct Cli {
 }
 
 fn main() {
+    install_panic_hook();
     let cli = Cli::parse();
     let code = match (cli.merge_folder, cli.output) {
         (Some(dir), Some(out)) => headless_merge(&dir, &out),
@@ -36,36 +37,88 @@ fn main() {
 }
 
 fn run_gui() -> i32 {
-    let engine = match pdf::PdfEngine::new() {
+    gui_log(&format!("gui start (v{})", env!("CARGO_PKG_VERSION")));
+
+    let mut engine = match pdf::PdfEngine::new() {
         Ok(e) => e,
         Err(e) => {
+            let msg = format!("{e:#}");
+            gui_log(&format!("pdfium init failed: {msg}"));
             rfd::MessageDialog::new()
                 .set_title("hema pdfTool")
-                .set_description(format!("{e:#}"))
+                .set_description(msg)
                 .set_level(rfd::MessageLevel::Error)
                 .show();
             return 1;
         }
     };
 
+    // Try the default renderer first (wgpu when both features are enabled),
+    // then the other one. wgpu fails on machines without a usable GPU/driver
+    // (VMs, remote desktop, old drivers); glow only needs basic OpenGL.
+    let renderers = match eframe::Renderer::default() {
+        eframe::Renderer::Wgpu => [eframe::Renderer::Wgpu, eframe::Renderer::Glow],
+        eframe::Renderer::Glow => [eframe::Renderer::Glow, eframe::Renderer::Wgpu],
+    };
+
+    let mut failures = Vec::new();
+    for renderer in renderers {
+        gui_log(&format!("trying renderer {renderer}"));
+        // run_native can panic (not just error) during GPU init.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            run_eframe(engine, renderer)
+        }));
+        match result {
+            Ok(Ok(())) => return 0,
+            Ok(Err(e)) => failures.push(format!("{renderer}: {e}")),
+            Err(_) => failures.push(format!("{renderer}: panicked during startup")),
+        }
+        gui_log(&format!("renderer failed: {}", failures.last().unwrap()));
+        match pdf::PdfEngine::new() {
+            Ok(e) => engine = e,
+            Err(e) => {
+                gui_log(&format!("pdfium re-init failed: {e:#}"));
+                break;
+            }
+        }
+    }
+
+    let msg = format!(
+        "Could not start the application window.\n\n{}\n\nDetails: %APPDATA%\\hema_pdfTool\\gui.log",
+        failures.join("\n")
+    );
+    gui_log(&format!("all renderers failed: {}", failures.join(" | ")));
+    rfd::MessageDialog::new()
+        .set_title("hema pdfTool")
+        .set_description(msg)
+        .set_level(rfd::MessageLevel::Error)
+        .show();
+    1
+}
+
+fn run_eframe(engine: pdf::PdfEngine, renderer: eframe::Renderer) -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
+        renderer,
         viewport: eframe::egui::ViewportBuilder::default()
             .with_inner_size([1100.0, 750.0])
             .with_min_inner_size([640.0, 480.0]),
         ..Default::default()
     };
-
-    match eframe::run_native(
+    eframe::run_native(
         "hema pdfTool",
         options,
-        Box::new(|cc| Ok(Box::new(app::PdfToolApp::new(engine, &cc.egui_ctx)))),
-    ) {
-        Ok(()) => 0,
-        Err(e) => {
-            eprintln!("{e}");
-            1
-        }
-    }
+        Box::new(move |cc| {
+            Ok(Box::new(app::PdfToolApp::new(engine, &cc.egui_ctx)))
+        }),
+    )
+}
+
+/// Logs panics to gui.log. A windows-subsystem exe has no console, so
+/// without this a crash (e.g. during GPU init) is completely invisible.
+fn install_panic_hook() {
+    std::panic::set_hook(Box::new(|info| {
+        gui_log(&format!("panic: {info}"));
+    }));
 }
 
 /// Merges every *.pdf in `dir` (sorted by file name) into `out`.
@@ -137,7 +190,15 @@ fn headless_merge_inner(dir: &Path, out: &Path) -> anyhow::Result<(usize, usize)
 }
 
 fn log(msg: &str) {
-    if let Some(path) = settings::log_path() {
+    write_log(settings::log_path(), msg);
+}
+
+fn gui_log(msg: &str) {
+    write_log(settings::gui_log_path(), msg);
+}
+
+fn write_log(path: Option<PathBuf>, msg: &str) {
+    if let Some(path) = path {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }

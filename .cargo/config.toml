@@ -1,0 +1,4 @@
+# Statically link the MSVC CRT so the exe doesn't depend on a VC++
+# redistributable (vcruntime140.dll etc.) being installed on target machines.
+[build]
+rustflags = ["-C", "target-feature=+crt-static"]

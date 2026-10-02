@@ -57,3 +57,8 @@ pub fn save(settings: &Settings) {
 pub fn log_path() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join("hema_pdfTool").join("merge.log"))
 }
+
+/// Path of the log file for GUI startup diagnostics and crashes.
+pub fn gui_log_path() -> Option<PathBuf> {
+    dirs::config_dir().map(|d| d.join("hema_pdfTool").join("gui.log"))
+}
