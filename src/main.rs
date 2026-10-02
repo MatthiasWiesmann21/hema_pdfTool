@@ -36,51 +36,66 @@ fn main() {
     std::process::exit(code);
 }
 
+/// Exit code of a pinned child when pdfium itself failed to load —
+/// retrying another renderer won't help, so the launcher stops.
+const EXIT_PDFIUM_FAILED: i32 = 3;
+
+/// Env var that pins a child process to one renderer.
+const RENDERER_ENV: &str = "HEMA_PDFTOOL_RENDERER";
+
 fn run_gui() -> i32 {
     gui_log(&format!("gui start (v{})", env!("CARGO_PKG_VERSION")));
 
-    let mut engine = match pdf::PdfEngine::new() {
-        Ok(e) => e,
-        Err(e) => {
-            let msg = format!("{e:#}");
-            gui_log(&format!("pdfium init failed: {msg}"));
-            rfd::MessageDialog::new()
-                .set_title("hema pdfTool")
-                .set_description(msg)
-                .set_level(rfd::MessageLevel::Error)
-                .show();
-            return 1;
+    match std::env::var_os(RENDERER_ENV) {
+        // Pinned child: runs exactly one renderer. A hard crash in GPU/driver
+        // code (no panic, no error — the process just dies) kills only this
+        // child; the launcher then tries the next renderer.
+        Some(name) => {
+            let renderer = if name == "glow" {
+                eframe::Renderer::Glow
+            } else {
+                eframe::Renderer::Wgpu
+            };
+            gui_log(&format!("child mode, renderer {renderer}"));
+            run_gui_child(renderer)
         }
+        None => run_gui_launcher(),
+    }
+}
+
+/// Spawns the GUI once per renderer (last-working one first). This process
+/// never touches GPU code, so driver crashes can't take it down.
+fn run_gui_launcher() -> i32 {
+    let order = match settings::load().renderer.as_deref() {
+        Some("glow") => ["glow", "wgpu"],
+        _ => ["wgpu", "glow"],
     };
 
-    // Try the default renderer first (wgpu when both features are enabled),
-    // then the other one. wgpu fails on machines without a usable GPU/driver
-    // (VMs, remote desktop, old drivers); glow only needs basic OpenGL.
-    let renderers = match eframe::Renderer::default() {
-        eframe::Renderer::Wgpu => [eframe::Renderer::Wgpu, eframe::Renderer::Glow],
-        eframe::Renderer::Glow => [eframe::Renderer::Glow, eframe::Renderer::Wgpu],
+    let exe = match std::env::current_exe() {
+        Ok(e) => e,
+        // Can't respawn ourselves — run in-process as a last resort.
+        Err(e) => {
+            gui_log(&format!("current_exe failed ({e}), running wgpu in-process"));
+            return run_gui_child(eframe::Renderer::Wgpu);
+        }
     };
 
     let mut failures = Vec::new();
-    for renderer in renderers {
-        gui_log(&format!("trying renderer {renderer}"));
-        // run_native can panic (not just error) during GPU init.
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            run_eframe(engine, renderer)
-        }));
-        match result {
-            Ok(Ok(())) => return 0,
-            Ok(Err(e)) => failures.push(format!("{renderer}: {e}")),
-            Err(_) => failures.push(format!("{renderer}: panicked during startup")),
-        }
-        gui_log(&format!("renderer failed: {}", failures.last().unwrap()));
-        match pdf::PdfEngine::new() {
-            Ok(e) => engine = e,
-            Err(e) => {
-                gui_log(&format!("pdfium re-init failed: {e:#}"));
-                break;
+    for name in order {
+        gui_log(&format!("launching renderer {name}"));
+        match std::process::Command::new(&exe)
+            .env(RENDERER_ENV, name)
+            .status()
+        {
+            Ok(s) if s.success() => {
+                remember_renderer(name);
+                return 0;
             }
+            Ok(s) if s.code() == Some(EXIT_PDFIUM_FAILED) => return 1,
+            Ok(s) => failures.push(format!("{name}: {s}")),
+            Err(e) => failures.push(format!("{name}: failed to launch ({e})")),
         }
+        gui_log(&format!("renderer {name} failed: {}", failures.last().unwrap()));
     }
 
     let msg = format!(
@@ -96,6 +111,40 @@ fn run_gui() -> i32 {
     1
 }
 
+fn remember_renderer(name: &str) {
+    let mut s = settings::load();
+    s.renderer = Some(name.to_string());
+    settings::save(&s);
+}
+
+fn run_gui_child(renderer: eframe::Renderer) -> i32 {
+    let engine = match pdf::PdfEngine::new() {
+        Ok(e) => e,
+        Err(e) => {
+            let msg = format!("{e:#}");
+            gui_log(&format!("pdfium init failed: {msg}"));
+            rfd::MessageDialog::new()
+                .set_title("hema pdfTool")
+                .set_description(msg)
+                .set_level(rfd::MessageLevel::Error)
+                .show();
+            return EXIT_PDFIUM_FAILED;
+        }
+    };
+
+    gui_log(&format!("trying renderer {renderer}"));
+    match run_eframe(engine, renderer) {
+        Ok(()) => {
+            gui_log("gui exited normally");
+            0
+        }
+        Err(e) => {
+            gui_log(&format!("renderer {renderer} failed: {e}"));
+            1
+        }
+    }
+}
+
 fn run_eframe(engine: pdf::PdfEngine, renderer: eframe::Renderer) -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         renderer,
@@ -108,6 +157,7 @@ fn run_eframe(engine: pdf::PdfEngine, renderer: eframe::Renderer) -> Result<(), 
         "hema pdfTool",
         options,
         Box::new(move |cc| {
+            gui_log("window created");
             Ok(Box::new(app::PdfToolApp::new(engine, &cc.egui_ctx)))
         }),
     )

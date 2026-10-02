@@ -31,10 +31,14 @@ this command as Windows Task Scheduler task `HemaPdfTool-AutoMerge`.
 
 The release exe is `windows_subsystem = "windows"` — no console, so all
 startup output would be lost. Instead, GUI startup/panics log to
-`%APPDATA%\hema_pdfTool\gui.log`. eframe tries wgpu first, then falls
-back to the `glow` (OpenGL) renderer if no GPU adapter is available
-(VMs, RDP, old drivers). The exe statically links the CRT
-(`.cargo/config.toml`), so no VC++ redistributable is needed.
+`%APPDATA%\hema_pdfTool\gui.log`.
+
+GPU crashes (driver access violations) can't be caught in-process, so
+the GUI runs renderers in child processes: the launcher spawns the exe
+with `HEMA_PDFTOOL_RENDERER=wgpu|glow`, waits, and on a non-zero exit
+tries the next renderer. The working renderer is persisted in
+settings.json and tried first next launch. The exe statically links the
+CRT (`.cargo/config.toml`), so no VC++ redistributable is needed.
 
 ## Windows installer
 

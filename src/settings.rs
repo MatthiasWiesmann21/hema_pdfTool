@@ -16,6 +16,8 @@ pub struct Settings {
     pub sched_freq: usize,
     /// Weekday for weekly schedule: 0 = Monday .. 6 = Sunday.
     pub sched_weekday: usize,
+    /// Renderer that worked last time ("wgpu" or "glow"); tried first.
+    pub renderer: Option<String>,
 }
 
 impl Default for Settings {
@@ -27,6 +29,7 @@ impl Default for Settings {
             sched_time: "18:00".into(),
             sched_freq: 0,
             sched_weekday: 0,
+            renderer: None,
         }
     }
 }
