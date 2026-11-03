@@ -6,9 +6,16 @@ just the pages you selected.
 
 ## Features
 
-- **Drag & drop** PDF files onto the window (or "Add PDFs…")
-- **Thumbnail grid** — drag pages to reorder, click a page or its checkbox to select it
-- Per page: **rotate** CCW/CW, **delete**
+- **Drag & drop** PDF files onto the window (or "Add")
+- **Layouts** — small / normal / large tiles or a list view; drag pages to reorder,
+  click a page to select it
+- Every page shows its **source file** (with a per-document color) and its
+  **original page number** ("Page 3 of 12")
+- **Quick Look preview** — Space (or the eye icon) opens a large preview,
+  Space / Esc / ✕ closes it, ← → browses
+- Per page: **rotate** left/right, **delete**
+- **Languages**: German (default), English, French, Spanish, Italian
+- **Light / dark / system** theme
 - **Merge all…** → save as a single PDF; **Extract selected…** → save a subset
 - **Schedule…** — registers a Windows Task Scheduler task that auto-merges
   all PDFs in a folder on a daily / weekly / logon schedule

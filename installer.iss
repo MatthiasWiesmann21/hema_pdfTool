@@ -5,7 +5,7 @@
 
 #define AppName "hema pdfTool"
 #define AppExeName "hema_pdf_tool.exe"
-#define AppVersion "0.2.2"
+#define AppVersion "0.3.0"
 #define AppId "{{551BC3FC-D69E-4602-9162-DBA9BD45C5F8}"
 
 [Setup]
@@ -25,10 +25,17 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\{#AppExeName}
+; German is the default: no auto-detection, the first [Languages] entry is
+; preselected in the language dialog.
+ShowLanguageDialog=yes
+LanguageDetectionMethod=none
 
 [Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "german";  MessagesFile: "compiler:Languages\German.isl"
+Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "french";  MessagesFile: "compiler:Languages\French.isl"
+Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
+Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"

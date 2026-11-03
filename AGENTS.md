@@ -53,6 +53,25 @@ needed. Bundles `pdfium.dll`, creates Start Menu + optional desktop
 shortcut, registers in Settings > Apps with an uninstaller. Bump
 `AppVersion` in `installer.iss` when the crate version changes.
 
+## GUI code layout
+
+- `src/app/mod.rs` — app state, header / action bar / status bar, shortcuts
+- `src/app/pages.rs` — tile grid (3 sizes) + list view, empty state
+- `src/app/preview.rs` — Quick Look overlay (`egui::Modal`), renders on
+  demand via `PdfEngine::render_page`
+- `src/app/theme.rs` — palette, light/dark visuals, Phosphor icon font
+- `src/app/windows.rs` — help + scheduler windows
+
+## Translations
+
+All UI strings live in `src/i18n.rs`: one `const Tr` per language (De is
+the default). To add a string, add a field to `Tr` and fill it in every
+language — the compiler flags any missing one. Placeholders like `{n}` are
+filled with `i18n::fmt`. Language/theme/layout are persisted in
+settings.json.
+
+The minimal rustup profile has no clippy: `rustup component add clippy`.
+
 ## Test fixtures
 
 ```cmd

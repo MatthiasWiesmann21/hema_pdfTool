@@ -1,7 +1,40 @@
 //! Persisted settings in %APPDATA%\hema_pdfTool\settings.json (or platform config dir).
 
+use crate::i18n::Lang;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+/// Page view in the main area.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum Layout {
+    Small,
+    #[default]
+    Normal,
+    Large,
+    List,
+}
+
+impl Layout {
+    pub const ALL: [Layout; 4] = [Layout::Small, Layout::Normal, Layout::Large, Layout::List];
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum ThemeMode {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
+impl ThemeMode {
+    pub fn next(self) -> Self {
+        match self {
+            ThemeMode::System => ThemeMode::Light,
+            ThemeMode::Light => ThemeMode::Dark,
+            ThemeMode::Dark => ThemeMode::System,
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -18,6 +51,9 @@ pub struct Settings {
     pub sched_weekday: usize,
     /// Renderer that worked last time ("wgpu" or "glow"); tried first.
     pub renderer: Option<String>,
+    pub language: Lang,
+    pub theme: ThemeMode,
+    pub layout: Layout,
 }
 
 impl Default for Settings {
@@ -30,6 +66,9 @@ impl Default for Settings {
             sched_freq: 0,
             sched_weekday: 0,
             renderer: None,
+            language: Lang::default(),
+            theme: ThemeMode::default(),
+            layout: Layout::default(),
         }
     }
 }

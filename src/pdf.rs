@@ -63,24 +63,28 @@ impl PdfEngine {
             .with_context(|| format!("failed to open {}", path.display()))?;
 
         let config = PdfRenderConfig::new().set_target_width(target_width);
-        let mut thumbs = Vec::with_capacity(doc.pages().len() as usize);
+        (0..doc.pages().len())
+            .map(|index| render_one(&doc, path, index, &config))
+            .collect()
+    }
 
-        for index in 0..doc.pages().len() {
-            let page = doc
-                .pages()
-                .get(index)
-                .with_context(|| format!("page {index} not found in {}", path.display()))?;
-            let bitmap = page
-                .render_with_config(&config)
-                .with_context(|| format!("failed to render page {index} of {}", path.display()))?;
-            thumbs.push(Thumbnail {
-                width: bitmap.width() as usize,
-                height: bitmap.height() as usize,
-                rgba: bitmap.as_rgba_bytes(),
-            });
-        }
-
-        Ok(thumbs)
+    /// Renders a single page in high resolution (used by the large preview).
+    /// The page fits within `max_width` × `max_height` pixels.
+    pub fn render_page(
+        &self,
+        path: &Path,
+        index: i32,
+        max_width: i32,
+        max_height: i32,
+    ) -> Result<Thumbnail> {
+        let doc = self
+            .pdfium
+            .load_pdf_from_file(path, None)
+            .with_context(|| format!("failed to open {}", path.display()))?;
+        let config = PdfRenderConfig::new()
+            .set_target_width(max_width)
+            .set_maximum_height(max_height);
+        render_one(&doc, path, index, &config)
     }
 
     /// Builds a new PDF at `out` containing `ops` pages in the given order,
@@ -154,6 +158,26 @@ impl PdfEngine {
         }
         result
     }
+}
+
+fn render_one(
+    doc: &PdfDocument<'_>,
+    path: &Path,
+    index: i32,
+    config: &PdfRenderConfig,
+) -> Result<Thumbnail> {
+    let page = doc
+        .pages()
+        .get(index)
+        .with_context(|| format!("page {index} not found in {}", path.display()))?;
+    let bitmap = page
+        .render_with_config(config)
+        .with_context(|| format!("failed to render page {index} of {}", path.display()))?;
+    Ok(Thumbnail {
+        width: bitmap.width() as usize,
+        height: bitmap.height() as usize,
+        rgba: bitmap.as_rgba_bytes(),
+    })
 }
 
 /// Moves `tmp` over `dest` (Windows rename refuses to overwrite existing files).
